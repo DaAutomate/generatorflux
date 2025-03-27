@@ -15,34 +15,21 @@ st.set_page_config(
 st.title("🎨 Generator Obrazów FLUX1.1 Pro")
 st.write("Generuj niesamowite obrazy przy użyciu modelu FLUX1.1 Pro")
 
-# Sprawdź, czy sekrety są skonfigurowane
-if 'FAL_KEY_ID' in st.secrets and 'FAL_KEY_SECRET' in st.secrets:
+# Zawsze pobieraj klucze API z sekretów Streamlit
+try:
     # Odczytaj klucze API z sekretów
     fal_key_id = st.secrets["FAL_KEY_ID"]
     fal_key_secret = st.secrets["FAL_KEY_SECRET"]
-    keys_from_secrets = True
-else:
-    # Jeśli sekrety nie są dostępne, pozwól na ręczne wprowadzenie
-    fal_key_id = None
-    fal_key_secret = None
-    keys_from_secrets = False
+    
+    # Ustaw klucz API od razu
+    fal_client.api_key = f"{fal_key_id}:{fal_key_secret}"
+except Exception:
+    # Informuj o braku kluczy API tylko przy generowaniu
+    pass
 
 # Panel boczny dla opcji
 with st.sidebar:
-    st.header("Konfiguracja")
-    
-    # Pole wprowadzania klucza API tylko jeśli nie znaleziono w sekretach
-    if not keys_from_secrets:
-        st.warning("Klucze API nie są skonfigurowane w sekretach. Wprowadź je ręcznie:")
-        fal_key_id = st.text_input("Wprowadź ID klucza API", type="password", help="Pierwsza część klucza API")
-        fal_key_secret = st.text_input("Wprowadź sekret klucza API", type="password", help="Druga część klucza API")
-    else:
-        st.success("Klucze API zostały wczytane z sekretów Streamlit")
-    
-    st.markdown("---")
-    
-    # Opcje modelu
-    st.subheader("Ustawienia Modelu")
+    st.header("Ustawienia Modelu")
     
     # Opcje bezpieczeństwa
     enable_safety = st.checkbox("Włącz filtr bezpieczeństwa", value=True)
@@ -119,16 +106,18 @@ def on_queue_update(update):
             status_placeholder.info(log["message"])
 
 def generate_image():
-    if not fal_key_id or not fal_key_secret:
-        st.error("⚠️ Klucze API nie są dostępne. Skonfiguruj sekrety lub wprowadź klucze ręcznie.")
-        return
+    # Sprawdź, czy klucze API są dostępne
+    try:
+        if not fal_client.api_key:
+            # Jeśli klucz nie został ustawiony wcześniej, spróbuj jeszcze raz
+            fal_client.api_key = f"{st.secrets['FAL_KEY_ID']}:{st.secrets['FAL_KEY_SECRET']}"
+    except Exception:
+        st.error("⚠️ Brak kluczy API w sekretach Streamlit. Skonfiguruj sekrety przed użyciem aplikacji.")
+        st.stop()
     
     if not prompt:
         st.error("⚠️ Proszę wprowadzić opis obrazu")
         return
-    
-    # Ustawienie klucza API
-    fal_client.api_key = f"{fal_key_id}:{fal_key_secret}"
     
     # Przygotuj argumenty - używając dokładnie tych samych nazw parametrów i domyślnych wartości jak w dokumentacji
     arguments = {
@@ -217,27 +206,6 @@ with st.expander("Wskazówki do tworzenia lepszych opisów"):
     ```
     Fotorealistyczne śniadanie dla diety przeciwzapalnej: miska owsianki z nasionami chia, świeżymi borówkami, płatkami migdałów i odrobiną miodu. Łyżka obok miski, czysty stół, przytulne poranne oświetlenie, bez etykiet czy tekstu, wysokiej rozdzielczości fotografia kulinarna.
     ```
-    """)
-
-# Instrukcja konfiguracji sekretów
-with st.expander("Jak skonfigurować sekrety API w Streamlit"):
-    st.markdown("""
-    ### Konfiguracja sekretów API w Streamlit Community Cloud
-
-    1. Otwórz swoją aplikację w Streamlit Community Cloud
-    2. Kliknij przycisk z trzema kropkami (⋮) w prawym górnym rogu
-    3. Wybierz "Settings"
-    4. Przewiń w dół do sekcji "Secrets"
-    5. Kliknij "Edit secrets"
-    6. Wklej swoje sekrety w formacie TOML:
-
-    ```toml
-    FAL_KEY_ID = "twój-id-klucza"
-    FAL_KEY_SECRET = "twój-sekret-klucza"
-    ```
-
-    7. Kliknij "Save"
-    8. Uruchom ponownie aplikację
     """)
 
 # Stopka
